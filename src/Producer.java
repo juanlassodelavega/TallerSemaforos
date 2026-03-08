@@ -1,47 +1,42 @@
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
-public class Producer extends Thread{
-	
-	public Producer() {
-		start();
-	}
-	
-	private void produce() {
-		Random rdmNum = new Random();
-		int numP = rdmNum.nextInt(999) + 1;
-		int sleepTime = rdmNum.nextInt(250 - 25 + 1) + 25; //Rango (max - min + 1) + min
-		
-		try {
-			sleep(sleepTime);
-			
-		}catch(InterruptedException e) {
-			e.printStackTrace();
-		}
-		
-		System.out.println("Productor: Número " + numP + " producido.");
-		
-		//Añadir al buffer
-		Buffer.getStore().add(numP);
-	}
-	
-	@Override
-	public void run () {
-		
-		while(true) {
-			
-			if(Buffer.getStore().size() == Buffer.bSize) {
-				System.out.println("Productor: El buffer está lleno, esperando a que el consumidor trabaje.");
-			}
-			
-			try {
-				Buffer.getsNoLleno().acquire();
-			}catch(InterruptedException e){
-				e.printStackTrace();
-			}
-			
-			produce();
-			
-			Buffer.getsNoVacio().release();
-		}
-	}
+public class Producer extends Thread {
+
+    private static final int MIN_SLEEP_MS = 25;
+    private static final int MAX_SLEEP_MS = 250;
+    private static final int MIN_NUMBER = 1;
+    private static final int MAX_NUMBER = 999;
+
+    private volatile boolean running = true;
+
+    public Producer() {
+        super("producer-thread");
+    }
+
+    public void shutdown() {
+        running = false;
+        interrupt();
+    }
+
+    private void produce() throws InterruptedException {
+        int producedNumber = ThreadLocalRandom.current().nextInt(MIN_NUMBER, MAX_NUMBER + 1);
+        int sleepTime = ThreadLocalRandom.current().nextInt(MIN_SLEEP_MS, MAX_SLEEP_MS + 1);
+
+        Thread.sleep(sleepTime);
+        Buffer.put(producedNumber);
+        System.out.println("Productor: NÃºmero " + producedNumber + " producido. TamaÃ±o actual: " + Buffer.size());
+    }
+
+    @Override
+    public void run() {
+        while (running) {
+            try {
+                produce();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        System.out.println("Productor detenido.");
+    }
 }
