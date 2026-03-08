@@ -1,47 +1,39 @@
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
-public class Consumer extends Thread{
-	
-	public Consumer() {
-		start();
-	}
-	
-	private void consume() {
-		
-		Random rdmNum = new Random();
-		int sleepTime = rdmNum.nextInt(250 - 25 + 1) + 25;
-		
-		try {
-			sleep(sleepTime);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		
-		//Consumir el elemento
-		int consumedNumber = Buffer.getStore().poll();
-		System.out.println("Consumidor: Número " + consumedNumber + " consumido.");
-		
-	}
-	
-	@Override
-	public void run() {
-		
-		while(true) {
-			
-			if(Buffer.getStore().size() == 0) {
-				
-				System.out.println("Consumidor: El buffer está vacio, esperando a que el productor trabaje.");
-			}
-			
-			try {
-				Buffer.getsNoVacio().acquire();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			
-			consume();
-			
-			Buffer.getsNoLleno().release();
-		}
-	}
+public class Consumer extends Thread {
+
+    private static final int MIN_SLEEP_MS = 25;
+    private static final int MAX_SLEEP_MS = 250;
+
+    private volatile boolean running = true;
+
+    public Consumer() {
+        super("consumer-thread");
+    }
+
+    public void shutdown() {
+        running = false;
+        interrupt();
+    }
+
+    private void consume() throws InterruptedException {
+        int sleepTime = ThreadLocalRandom.current().nextInt(MIN_SLEEP_MS, MAX_SLEEP_MS + 1);
+
+        Thread.sleep(sleepTime);
+        int consumedNumber = Buffer.take();
+        System.out.println("Consumidor: NÃºmero " + consumedNumber + " consumido. TamaÃ±o actual: " + Buffer.size());
+    }
+
+    @Override
+    public void run() {
+        while (running) {
+            try {
+                consume();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        System.out.println("Consumidor detenido.");
+    }
 }
